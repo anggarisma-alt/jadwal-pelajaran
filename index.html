@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light" data-bs-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#047857">
+  <meta name="description" content="Jadwal pelajaran dan jadwal piket guru madrasah.">
+  <title>Jadwal MTs</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23047857'/%3E%3Cpath d='M18 22h28v26H18z' fill='none' stroke='%23fff' stroke-width='4' stroke-linejoin='round'/%3E%3Cpath d='M18 30h28M26 16v10M38 16v10' stroke='%23fff' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+
+  <!-- Koneksi awal lebih cepat -->
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://script.google.com">
+  <link rel="preconnect" href="https://script.googleusercontent.com">
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="css/style.css?v=1.0.3" rel="stylesheet">
+</head>
+<body>
+  <noscript><p style="padding:24px;font-family:sans-serif">Aplikasi ini membutuhkan JavaScript. Aktifkan JavaScript di browser Anda.</p></noscript>
+
+  <!-- Loading awal -->
+  <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
+    <div class="load-logo"><i class="bi bi-calendar2-week"></i></div>
+    <div class="spin spin-lg"></div>
+    <p>Memuat Jadwal MTs…</p>
+  </div>
+
+  <!-- Indikator proses server -->
+  <div id="topProgress" class="top-progress" aria-hidden="true"></div>
+
+  <div class="app-shell">
+    <aside id="sidebar" class="sidebar" aria-label="Menu utama">
+      <div class="side-brand">
+        <span class="brand-logo" id="sideLogo"><i class="bi bi-calendar2-week"></i></span>
+        <div><strong id="sideTitle">Jadwal MTs</strong><small id="sideSub">Jadwal pelajaran &amp; piket</small></div>
+      </div>
+      <nav id="sideNav" class="side-nav"></nav>
+      <div class="side-foot" id="sideFoot"></div>
+    </aside>
+
+    <div class="app-main">
+      <header class="appbar">
+        <div class="appbar-brand">
+          <span class="brand-logo sm" id="barLogo"><i class="bi bi-calendar2-week"></i></span>
+          <div class="appbar-text"><strong id="pageTitle">Jadwal MTs</strong><small id="pageSub"></small></div>
+        </div>
+        <div class="appbar-actions">
+          <button type="button" class="icon-btn" onclick="toggleTheme()" aria-label="Ganti mode terang/gelap"><i id="themeIcon" class="bi bi-moon-stars"></i></button>
+          <button type="button" id="btnUser" class="icon-btn" onclick="userButton()" aria-label="Akun"><i class="bi bi-person-circle"></i></button>
+        </div>
+      </header>
+
+      <main id="mainContent" class="main-content">
+        <div id="app-container"></div>
+      </main>
+    </div>
+  </div>
+
+  <nav id="bottomNav" class="bottom-nav" aria-label="Navigasi utama"></nav>
+
+  <!-- Modal serbaguna (bottom-sheet di ponsel) -->
+  <div class="modal fade" id="appModal" tabindex="-1" aria-labelledby="appModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable" id="appModalDlg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title" id="appModalTitle">Judul</h2>
+          <button type="button" class="btn-close" id="appModalClose" data-bs-dismiss="modal" aria-label="Tutup"></button>
+        </div>
+        <div class="modal-body" id="appModalBody"></div>
+        <div class="modal-footer" id="appModalFooter"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal konfirmasi -->
+  <div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header"><h2 class="modal-title" id="confirmTitle">Konfirmasi</h2></div>
+        <div class="modal-body" id="confirmBody"></div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="button" class="btn btn-primary" id="confirmOk">Ya, lanjut</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+
+  <!-- Semua skrip defer. Chart.js & bundel admin dimuat lazy saat dibutuhkan. -->
+  <script defer src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script defer src="js/config.js?v=1.0.3"></script>
+  <script defer src="js/core.js?v=1.0.3"></script>
+</body>
+</html>
