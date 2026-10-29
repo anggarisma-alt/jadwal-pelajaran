@@ -163,7 +163,7 @@ Contoh: pilih jenis *Upacara*, hari *Senin*, posisi *Menggantikan jam pelajaran 
 
 ## G. Memperbarui dari versi sebelumnya
 
-1. **Backend**: tempel `Kode.gs` terbaru → jalankan **`setupAppEnvironment`** lagi (aman; hanya menambah kolom baru: `mengisi_jam` pada `BlokWaktu` dan `blok_jam` pada `Mapel`; data tidak berubah) → *Terapkan → Kelola deployment → ✏️ Edit → Versi baru → Terapkan*.
+1. **Backend**: tempel `Kode.gs` terbaru → jalankan **`setupAppEnvironment`** lagi (aman; hanya menambah kolom baru: `mengisi_jam` pada `BlokWaktu`, serta `blok_jam` dan `gabung_maks` pada `Mapel`; data tidak berubah) → *Terapkan → Kelola deployment → ✏️ Edit → Versi baru → Terapkan*.
 2. **Frontend**: ganti isi folder dengan versi baru (atau salin berkas yang berubah), lalu `git add .` → `git commit -m "Update"` → `git push`. Tekan **Ctrl+Shift+R** bila tampilan lama masih muncul.
 3. Blok *Upacara* lama (cara "ditambahkan") tidak berubah otomatis; ubah posisinya di Pengaturan Waktu bila ingin menempati jam ke-1.
 
@@ -186,3 +186,16 @@ Contoh: pilih jenis *Upacara*, hari *Senin*, posisi *Menggantikan jam pelajaran 
 - Isi jam **0** bila rombel itu **tidak mengambil** mapel standar tingkatnya (tidak akan diisi ulang oleh *Isi guru otomatis*).
 - Tombol **Tambah** memasukkan mapel khusus yang tidak ada di standar tingkat (diberi tanda *Khusus rombel*).
 - **Salin dari rombel…** menyalin mapel, jam, dan guru dari rombel lain; **Kembalikan ke standar** mengembalikan ke jam standar tingkat. Perubahan baru tersimpan setelah menekan *Simpan beban*.
+
+## I. Kelas gabungan (satu guru, beberapa kelas bersamaan)
+
+*Data → Mapel → (pilih mapel) → **Kelas gabungan***: pilih **Boleh digabung hingga N kelas** (2–6). Default-nya *Tidak*.
+
+- Untuk mapel tersebut, guru **boleh terjadwal di lebih dari satu kelas pada jam yang sama** (mis. PJOK VII A + VII B di lapangan). Tidak dianggap bentrok selama: mapelnya sama, jumlah kelas tidak melebihi N, dan (sebaiknya) kelasnya **satu tingkat**.
+- **Tiap rombel dihitung sebagai jam mengajar tersendiri.** Dua kelas yang diajar bersamaan = **2 jam** terhadap batas jam/hari dan jam/minggu guru, dasbor, dan tampilan jadwal guru. Jadi gabungan **hanya melonggarkan bentrok waktu**, tidak mengurangi beban jam guru.
+- **Kapan berguna:** saat waktu tersedia guru terbatas (mis. guru hanya hadir jam ke-1 s.d. 4, sehingga 14 kelas × 3 jam tidak muat sebagai 42 slot terpisah). Pada uji: tanpa gabungan 19 jam gagal tertempatkan, dengan gabungan ≤2 semuanya tertempatkan. Bila kendalanya batas jam/minggu guru, gabungan tidak membantu — naikkan batas guru atau tambah guru.
+- **Susun otomatis** menggabungkan sendiri hanya kelas **satu tingkat** dan sedikit mengutamakan penggabungan.
+- **Edit manual**: di dialog slot, guru yang bisa digabung ditandai *"digabung dengan VII A"*. Bila batas penuh, mapel berbeda, atau mapel belum diizinkan, muncul alasan jelas. Gabungan lintas tingkat diperbolehkan manual tetapi diberi peringatan.
+- Pada tampilan *Per guru*, PDF, dan Excel, sel kelas gabungan tampil sebagai **"VII A + VII B"**.
+- Dapat dikombinasikan dengan *Harus berurutan* (mis. PJOK gabungan 2 kelas, 2 jam berurutan).
+- Data contoh: PJOK diatur boleh digabung hingga 2 kelas.

@@ -274,8 +274,11 @@ const kodeOf = c => (c.mapel && c.mapel.kode) || '?';
 function cellOf(kind, id, hari, jam) {
   if (kind === 'kelas') { const r = X.jd[id + '|' + hari + '|' + jam]; return r ? { r, mapel: X.mapel[r.mapel_id], guru: X.guru[r.guru_id], kelas: X.kelas[r.kelas_id] } : null; }
   const a = X.jg[id + '|' + hari + '|' + jam]; if (!a || !a.length) return null;
-  const r = a[0]; return { r, mapel: X.mapel[r.mapel_id], kelas: X.kelas[r.kelas_id], guru: X.guru[id] };
+  const r = a[0]; return { r, rs: a, mapel: X.mapel[r.mapel_id], kelas: X.kelas[r.kelas_id], kelasList: a.map(x => X.kelas[x.kelas_id]).filter(Boolean), guru: X.guru[id] };
 }
+/** Nama kelas pada sel (kelas gabungan: "VII A + VII B") dan status bentrok sel */
+const kelasNames = c => (c.kelasList || (c.kelas ? [c.kelas] : [])).map(k => k.nama).join(' + ');
+const cellConf = c => (c.rs || [c.r]).some(r => X.conf.has(r.id));
 /** Susunan baris: jam ke-n dan blok non-KBM (upacara/istirahat/shalat) di antara jam */
 function layoutRows() {
   const blocks = {}, rows = [];
@@ -287,7 +290,7 @@ function layoutRows() {
 function jamInfo(d, j) { return X.kbm[d].filter(r => r.jam_ke === j)[0]; }                 // hanya jam pelajaran (bisa diisi mapel)
 function slotRow(d, j) { return X.slots[d].filter(r => r.jam_ke === j)[0]; }               // nomor jam apa pun, termasuk yang ditempati blok (mis. upacara)
 function cellInner(kind, c) {
-  const second = kind === 'kelas' ? shortName(c.guru && c.guru.nama) : (c.kelas ? c.kelas.nama : '');
+  const second = kind === 'kelas' ? shortName(c.guru && c.guru.nama) : kelasNames(c);
   return '<b>' + esc(kodeOf(c)) + '</b><small>' + esc(second) + '</small>';
 }
 /** HTML tabel grid. opt.edit: sel bisa diklik (admin, per kelas). opt.print: tabel statis untuk cetak/PDF */
@@ -311,10 +314,10 @@ function renderGrid(kind, id, opt) {
       if (!sr) { h += '<td class="na">–</td>'; return; }
       if (sr.jenis !== 'KBM') { h += opt.print ? '<td><i>' + esc(sr.jenis) + '</i></td>' : '<td><div class="slotblok">' + esc(sr.jenis) + '<small>' + esc(sr.mulai) + '–' + esc(sr.selesai) + '</small></div></td>'; return; }
       const c = cellOf(kind, id, d, row.j);
-      if (opt.print) { h += '<td>' + (c ? '<b>' + esc(kodeOf(c)) + '</b><br>' + esc(kind === 'kelas' ? shortName(c.guru && c.guru.nama) : c.kelas && c.kelas.nama) : '') + '</td>'; return; }
+      if (opt.print) { h += '<td>' + (c ? '<b>' + esc(kodeOf(c)) + '</b><br>' + esc(kind === 'kelas' ? shortName(c.guru && c.guru.nama) : kelasNames(c)) : '') + '</td>'; return; }
       if (kind === 'guru' && !c && X.un.has(id + '|' + d + '|' + row.j)) { h += '<td class="unv">Tidak bisa</td>'; return; }
       if (!c) { h += '<td>' + (opt.edit ? '<button class="cell empty" aria-label="Isi ' + d + ' jam ke-' + row.j + '" onclick="openSlot(\'' + id + '\',\'' + d + '\',' + row.j + ')"><i class="bi bi-plus-lg"></i></button>' : '') + '</td>'; return; }
-      const cls = 'cell' + (X.conf.has(c.r.id) ? ' conf' : '');
+      const cls = 'cell' + (cellConf(c) ? ' conf' : '');
       const inner = cellInner(kind, c) + (c.r.terkunci ? '<i class="bi bi-lock-fill lk"></i>' : '');
       h += '<td>' + (opt.edit ? '<button class="' + cls + '" style="--h:' + (X.hue[c.r.mapel_id] || 150) + '" onclick="openSlot(\'' + id + '\',\'' + d + '\',' + row.j + ')" aria-label="' + esc((c.mapel || {}).nama) + '">' + inner + '</button>'
         : '<div class="' + cls + '" style="--h:' + (X.hue[c.r.mapel_id] || 150) + '" title="' + esc((c.mapel || {}).nama) + '">' + inner + '</div>') + '</td>';
@@ -346,8 +349,8 @@ function renderDayList(kind, id, opt) {
       h += '<div class="dl-item">' + t + '<' + tag + ' class="dl-body ' + (unv ? 'unv' : 'empty') + '"' + click + '>' + (unv ? 'Tidak bisa mengajar' : (opt.edit ? '<i class="bi bi-plus-lg"></i> Jam ke-' + r.jam_ke + ' kosong' : 'Jam ke-' + r.jam_ke + ' — kosong')) + '</' + tag + '></div>';
       return;
     }
-    const sub = kind === 'kelas' ? ((c.guru || {}).nama || '') : ((c.kelas || {}).nama || '');
-    h += '<div class="dl-item">' + t + '<' + tag + ' class="dl-body' + (X.conf.has(c.r.id) ? ' conf' : '') + '" style="--h:' + (X.hue[c.r.mapel_id] || 150) + '"' + click + '><strong>' + esc((c.mapel || {}).nama) + (c.r.terkunci ? ' <i class="bi bi-lock-fill"></i>' : '') + '</strong><small>Jam ke-' + r.jam_ke + ' • ' + esc(sub) + '</small></' + tag + '></div>';
+    const sub = kind === 'kelas' ? ((c.guru || {}).nama || '') : kelasNames(c);
+    h += '<div class="dl-item">' + t + '<' + tag + ' class="dl-body' + (cellConf(c) ? ' conf' : '') + '" style="--h:' + (X.hue[c.r.mapel_id] || 150) + '"' + click + '><strong>' + esc((c.mapel || {}).nama) + (c.r.terkunci ? ' <i class="bi bi-lock-fill"></i>' : '') + '</strong><small>Jam ke-' + r.jam_ke + ' • ' + esc(sub) + '</small></' + tag + '></div>';
   });
   return h + '</div>';
 }
@@ -361,6 +364,7 @@ function setDay(d) {
   if (S.page === 'g-home' || S.page === 'jadwal' || S.page.indexOf('pub') === 0) useModel(S.page.indexOf('pub') === 0 ? PUB : ADM);
   $('schedBox').innerHTML = '<div class="only-wide">' + renderGrid(s.kind, s.id, s.opt) + '</div><div class="only-narrow">' + renderDayList(s.kind, s.id, s.opt) + '</div>';
 }
+/** Jam per minggu: tiap rombel dihitung sebagai jam tersendiri (termasuk kelas gabungan) */
 function totalJam(kind, id) { return (M.Jadwal || []).filter(r => (kind === 'kelas' ? r.kelas_id : r.guru_id) === id).length; }
 
 // ── Ekspor/pratinjau: HTML statis + matriks Excel ──
@@ -376,7 +380,7 @@ function gridMatrix(kind, id) {
     const ri = slotRow(ref, row.j) || {};
     m.push([row.j + (ri.mulai ? ' (' + ri.mulai + '-' + ri.selesai + ')' : '')].concat(X.days.map(d => {
       const sr = slotRow(d, row.j); if (!sr) return '-'; if (sr.jenis !== 'KBM') return sr.jenis; const c = cellOf(kind, id, d, row.j);
-      return c ? kodeOf(c) + ' / ' + (kind === 'kelas' ? shortName(c.guru && c.guru.nama) : (c.kelas || {}).nama) : '';
+      return c ? kodeOf(c) + ' / ' + (kind === 'kelas' ? shortName(c.guru && c.guru.nama) : kelasNames(c)) : '';
     })));
   });
   return m;

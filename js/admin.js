@@ -101,7 +101,7 @@ function rekapHtml(kl) {
 }
 function showConflicts() {
   const cs = M.conflicts || [];
-  const ic = { tidak_berurutan: 'bi-layers-half', guru_ganda: 'bi-people', kelas_ganda: 'bi-layers', guru_tidak_tersedia: 'bi-calendar-x', lebih_hari: 'bi-graph-up-arrow', lebih_minggu: 'bi-graph-up-arrow', ruangan_ganda: 'bi-door-closed', slot_tidak_ada: 'bi-clock-history', bukan_pengampu: 'bi-person-x' };
+  const ic = { gabung_beda_tingkat: 'bi-people', tidak_berurutan: 'bi-layers-half', guru_ganda: 'bi-people', kelas_ganda: 'bi-layers', guru_tidak_tersedia: 'bi-calendar-x', lebih_hari: 'bi-graph-up-arrow', lebih_minggu: 'bi-graph-up-arrow', ruangan_ganda: 'bi-door-closed', slot_tidak_ada: 'bi-clock-history', bukan_pengampu: 'bi-person-x' };
   openModal({
     title: cs.length ? cs.length + ' peringatan bentrok' : 'Tidak ada bentrok',
     body: cs.length ? cs.slice(0, 150).map(c => '<div class="notice err"><i class="bi ' + (ic[c.type] || 'bi-exclamation-triangle') + '"></i><div>' + esc(c.msg) + '</div></div>').join('') + (cs.length > 150 ? '<p class="small muted">Menampilkan 150 pertama.</p>' : '') : '<div class="notice ok"><i class="bi bi-check-circle-fill"></i><div>Jadwal bebas dari bentrok guru, kelas, ruangan, dan batas jam mengajar.</div></div>',
@@ -110,14 +110,25 @@ function showConflicts() {
 }
 
 // ── Dialog slot (pilih mapel → guru) ──
-function guruProblems(gid, hari, jam, kid) {
+/** Kelas lain yang sedang diajar guru ini di slot yang sama + apakah boleh digabung (mapel sama, mapel mengizinkan, belum melewati batas) */
+function jointInfo(gid, hari, jam, kid, mid) {
+  const other = (X.jg[gid + '|' + hari + '|' + jam] || []).filter(r => r.kelas_id !== kid);
+  if (!other.length) return { other, bisa: false };
+  const mx = Number((X.mapel[mid] || {}).gabung_maks) || 0;
+  return { other, bisa: mx >= 2 && other.every(r => r.mapel_id === mid) && other.length + 1 <= mx };
+}
+function guruProblems(gid, hari, jam, kid, mid) {
   const g = X.guru[gid], p = [];
   if (X.un.has(gid + '|' + hari + '|' + jam)) p.push({ m: 'Tidak tersedia pada jam ini' });
-  const other = (X.jg[gid + '|' + hari + '|' + jam] || []).filter(r => r.kelas_id !== kid);
-  if (other.length) p.push({ m: 'Sedang mengajar ' + other.map(r => (X.kelas[r.kelas_id] || {}).nama).join(', ') });
+  const ji = jointInfo(gid, hari, jam, kid, mid);
+  if (ji.other.length && !ji.bisa) {
+    const mx = Number((X.mapel[mid] || {}).gabung_maks) || 0, sm = ji.other.every(r => r.mapel_id === mid);
+    p.push({ m: 'Sedang mengajar ' + ji.other.map(r => (X.kelas[r.kelas_id] || {}).nama).join(', ') + (mx >= 2 ? (sm ? ' (batas gabungan ' + mx + ' kelas tercapai)' : ' (mapel berbeda tidak bisa digabung)') : '') });
+  }
+  if (ji.bisa && ji.other.some(r => (X.kelas[r.kelas_id] || {}).tingkat !== (X.kelas[kid] || {}).tingkat)) p.push({ m: 'Digabung dengan kelas berbeda tingkat' });
   const mine = M.Jadwal.filter(r => r.guru_id === gid && !(r.kelas_id === kid && r.hari === hari && r.jam_ke === jam));
   const mh = +g.maks_jam_hari || +ADM.cfg.maks_jam_hari_default || 8, mm = +g.maks_jam_minggu || +ADM.cfg.maks_jam_minggu_default || 30;
-  if (mine.filter(r => r.hari === hari).length + 1 > mh) p.push({ m: 'Melebihi batas ' + mh + ' jam/hari' });
+  if (mine.filter(r => r.hari === hari).length + 1 > mh) p.push({ m: 'Melebihi batas ' + mh + ' jam/hari' });   // tiap rombel dihitung sebagai jam tersendiri
   if (mine.length + 1 > mm) p.push({ m: 'Melebihi batas ' + mm + ' jam/minggu' });
   return p;
 }
@@ -172,15 +183,15 @@ function slotGuruRender() {
   const gs = M.GuruMapel.filter(x => x.mapel_id === s.mapel).map(x => X.guru[x.guru_id]).filter(g => g && g.status !== 'Nonaktif');
   if (!gs.length) { box.innerHTML = '<div class="notice warn"><i class="bi bi-person-x"></i><div>Belum ada guru pengampu mapel ini. Atur di Data → Guru.</div></div>'; s.guru = ''; return; }
   const bg = (M.BebanMengajar.filter(b => b.kelas_id === s.kid && b.mapel_id === s.mapel)[0] || {}).guru_id;
-  const rows = gs.map(g => ({ g, p: guruProblems(g.id, s.hari, s.jam, s.kid) })).sort((a, b) => (a.p.length - b.p.length) || ((b.g.id === bg) - (a.g.id === bg)));
+  const rows = gs.map(g => ({ g, p: guruProblems(g.id, s.hari, s.jam, s.kid, s.mapel), jn: (function (ji) { return ji.bisa ? ji.other.map(r => (X.kelas[r.kelas_id] || {}).nama).join(' + ') : ''; })(jointInfo(g.id, s.hari, s.jam, s.kid, s.mapel)) })).sort((a, b) => (a.p.length - b.p.length) || ((b.g.id === bg) - (a.g.id === bg)));
   if (!s.guru || !gs.some(g => g.id === s.guru)) { const pick = rows.filter(r => !r.p.length && r.g.id === bg)[0] || rows.filter(r => !r.p.length)[0]; s.guru = pick ? pick.g.id : ''; }
-  box.innerHTML = rows.map(r => '<label class="opt ' + (r.p.length ? 'dis' : '') + '"><input type="radio" name="slG" value="' + r.g.id + '"' + (r.g.id === s.guru ? ' checked' : '') + ' onchange="slotGuru(\'' + r.g.id + '\')"><span class="ob"><b>' + esc(r.g.nama) + '</b>' + (r.p.length ? '<small style="color:var(--err)">' + r.p.map(x => esc(x.m)).join(' • ') + '</small>' : '<small style="color:var(--ok)">Tersedia' + (r.g.id === bg ? ' • guru beban kelas ini' : '') + '</small>') + '</span></label>').join('');
+  box.innerHTML = rows.map(r => '<label class="opt ' + (r.p.length ? 'dis' : '') + '"><input type="radio" name="slG" value="' + r.g.id + '"' + (r.g.id === s.guru ? ' checked' : '') + ' onchange="slotGuru(\'' + r.g.id + '\')"><span class="ob"><b>' + esc(r.g.nama) + '</b>' + (r.p.length ? '<small style="color:var(--err)">' + r.p.map(x => esc(x.m)).join(' • ') + '</small>' : '<small style="color:var(--ok)">Tersedia' + (r.jn ? ' • digabung dengan ' + esc(r.jn) : '') + (r.g.id === bg ? ' • guru beban kelas ini' : '') + '</small>') + '</span></label>').join('');
   slotWarn();
 }
 function slotWarn() {
   const s = S.slot, w = $('slWarn'); if (!w) return;
   const tg = slotTargets(s.hari, s.jam, s.span || 1);
-  const msgs = []; if (s.guru) tg.forEach(j => guruProblems(s.guru, s.hari, j, s.kid).forEach(p => msgs.push((X.guru[s.guru] || {}).nama + (tg.length > 1 ? ' (jam ke-' + j + ')' : '') + ': ' + p.m)));
+  const msgs = []; if (s.guru) tg.forEach(j => guruProblems(s.guru, s.hari, j, s.kid, s.mapel).forEach(p => msgs.push((X.guru[s.guru] || {}).nama + (tg.length > 1 ? ' (jam ke-' + j + ')' : '') + ': ' + p.m)));
   const timpa = tg.filter((j, i) => i > 0 && X.jd[s.kid + '|' + s.hari + '|' + j] && X.jd[s.kid + '|' + s.hari + '|' + j].mapel_id !== s.mapel).length; if (timpa) msgs.push(timpa + ' jam yang sudah berisi mapel lain akan ditimpa.');
   const rid = val('slRoom'); if (rid && M.Jadwal.some(x => x.ruangan_id === rid && x.hari === s.hari && x.jam_ke === s.jam && x.kelas_id !== s.kid)) msgs.push('Ruangan sedang dipakai kelas lain.');
   w.innerHTML = msgs.map(m => '<div><i class="bi bi-exclamation-triangle-fill"></i><span>' + esc(m) + ' — tetap dapat disimpan, tetapi akan muncul sebagai peringatan.</span></div>').join('');
@@ -343,16 +354,17 @@ function itemsMapel() {
   return L.map(m => {
     const jt = M.MapelJam.filter(x => x.mapel_id === m.id).sort((a, b) => tRank(a.tingkat) - tRank(b.tingkat)).map(x => x.tingkat + ':' + x.jam_per_minggu).join('  ');
     const np = M.GuruMapel.filter(x => x.mapel_id === m.id).length;
-    return '<button class="item" onclick="editMapel(\'' + m.id + '\')"><span class="avatar sw" style="--h:' + (X.hue[m.id] || 150) + '">' + esc(m.kode) + '</span><span class="item-body"><strong>' + esc(m.nama) + badgeOff(m) + (m.blok_jam >= 2 ? ' <span class="chip info"><i class="bi bi-layers-half"></i> berurutan ' + m.blok_jam + ' jam</span>' : '') + '</strong><small>' + esc(m.kelompok) + ' • ' + (jt || 'jam belum diatur') + ' • ' + np + ' pengampu</small></span><i class="bi bi-chevron-right go"></i></button>';
+    return '<button class="item" onclick="editMapel(\'' + m.id + '\')"><span class="avatar sw" style="--h:' + (X.hue[m.id] || 150) + '">' + esc(m.kode) + '</span><span class="item-body"><strong>' + esc(m.nama) + badgeOff(m) + (m.blok_jam >= 2 ? ' <span class="chip info"><i class="bi bi-layers-half"></i> berurutan ' + m.blok_jam + ' jam</span>' : '') + (m.gabung_maks >= 2 ? ' <span class="chip info"><i class="bi bi-people"></i> gabungan ≤' + m.gabung_maks + ' kelas</span>' : '') + '</strong><small>' + esc(m.kelompok) + ' • ' + (jt || 'jam belum diatur') + ' • ' + np + ' pengampu</small></span><i class="bi bi-chevron-right go"></i></button>';
   }).join('');
 }
 function editMapel(id) {
-  const m = id ? X.mapel[id] : { kode: '', nama: '', kelompok: 'Umum', status: 'Aktif', blok_jam: 0 }, ts = tingkatList(); S.fid = id || ''; S.ts = ts;
+  const m = id ? X.mapel[id] : { kode: '', nama: '', kelompok: 'Umum', status: 'Aktif', blok_jam: 0, gabung_maks: 0 }, ts = tingkatList(); S.fid = id || ''; S.ts = ts;
   openModal({
     title: id ? 'Ubah mata pelajaran' : 'Tambah mata pelajaran',
     body: '<div class="grid-2"><div class="field"><label class="form-label" for="fKode">Kode</label><input id="fKode" class="form-control" maxlength="8" value="' + esc(m.kode) + '" style="text-transform:uppercase"></div><div class="field"><label class="form-label" for="fKel">Kelompok</label><input id="fKel" list="dlKel" class="form-control" value="' + esc(m.kelompok) + '"><datalist id="dlKel"><option>Agama</option><option>Umum</option><option>Muatan Lokal</option><option>Pengembangan Diri</option></datalist></div></div>' +
       '<div class="field"><label class="form-label" for="fNama">Nama mata pelajaran</label><input id="fNama" class="form-control" value="' + esc(m.nama) + '"></div>' + statusSel(m.status) +
       '<div class="field"><label class="form-label" for="fBlok">Susunan jam dalam sehari</label><select id="fBlok" class="form-select" onchange="blokHint()"><option value="0"' + (!(m.blok_jam >= 2) ? ' selected' : '') + '>Bebas (boleh terpisah-pisah)</option>' + [2, 3, 4, 5, 6].map(n => '<option value="' + n + '"' + (m.blok_jam === n ? ' selected' : '') + '>Harus berurutan: ' + n + ' jam per pertemuan</option>').join('') + '</select><div class="form-text" id="fBlokHint"></div></div>' +
+      '<div class="field"><label class="form-label" for="fGab">Kelas gabungan (satu guru, beberapa kelas bersamaan)</label><select id="fGab" class="form-select"><option value="0"' + (!(m.gabung_maks >= 2) ? ' selected' : '') + '>Tidak — satu guru hanya satu kelas pada satu jam</option>' + [2, 3, 4, 5, 6].map(n => '<option value="' + n + '"' + (m.gabung_maks === n ? ' selected' : '') + '>Boleh digabung hingga ' + n + ' kelas</option>').join('') + '</select><div class="form-text">Contoh: PJOK dua rombel digabung di lapangan. Hanya kelas <b>satu tingkat</b> yang digabung otomatis. Tiap rombel tetap dihitung sebagai jam mengajar tersendiri.</div></div>' +
       '<h3 class="fs-6 mb-1">Jam standar per minggu tiap tingkat</h3><p class="small muted">Boleh berbeda antar tingkat. Jumlah jam dan mapel dapat disesuaikan per rombel di Data → Beban.</p>' +
       (ts.length ? '<div class="grid-3">' + ts.map((t, i) => '<div class="field"><label class="form-label" for="jt' + i + '">Tingkat ' + esc(t) + '</label><input id="jt' + i + '" type="number" min="0" max="30" class="form-control" value="' + ((M.MapelJam.filter(x => x.mapel_id === id && x.tingkat === t)[0] || {}).jam_per_minggu || '') + '"></div>').join('') + '</div>' : '<div class="notice warn"><i class="bi bi-exclamation-triangle"></i><div>Tambahkan kelas terlebih dahulu agar tingkat tersedia.</div></div>'),
     footer: (id ? delBtn('Mapel', id) : '') + '<button class="btn btn-primary" data-busy="Menyimpan…" onclick="saveMapel(this)">Simpan</button>',
@@ -368,7 +380,7 @@ function blokHint() {
 }
 function saveMapel(btn) {
   const jm = {}; S.ts.forEach((t, i) => { jm[t] = val('jt' + i); });
-  saveMaster(btn, 'apiSaveMapel', { id: S.fid, kode: val('fKode'), nama: val('fNama'), kelompok: val('fKel'), status: val('fStatus'), blok_jam: val('fBlok') }, jm);
+  saveMaster(btn, 'apiSaveMapel', { id: S.fid, kode: val('fKode'), nama: val('fNama'), kelompok: val('fKel'), status: val('fStatus'), blok_jam: val('fBlok'), gabung_maks: val('fGab') }, jm);
 }
 
 // ── Kelas ──
