@@ -166,7 +166,7 @@ function slotMapel(id) { S.slot.mapel = id; S.slot.guru = ''; S.slot.span = 0; s
 function slotTargets(hari, jam, span, kid) {
   useTingkat(X.kt[kid] || '');
   const list = X.kbm[hari], i = list.findIndex(r => r.jam_ke === jam); if (i < 0) return [jam];
-  const t = [jam]; for (let n = 1; n < span; n++) { const r = list[i + n]; if (!r || r.jam_ke !== list[i + n - 1].jam_ke + 1) break; t.push(r.jam_ke); }   // urutan nomor jam; istirahat tidak memutus
+  const t = [jam]; for (let n = 1; n < span; n++) { const r = list[i + n]; if (!r) break; t.push(r.jam_ke); }   // jam pelajaran yang bersebelahan; blok non-KBM di antaranya diabaikan
   return t;
 }
 function slotSpanRender() {
@@ -178,14 +178,14 @@ function slotSpanRender() {
     s.span = 1;
     if (!s.cur && B !== 1) {
       const per = M.BebanMengajar.filter(b => b.kelas_id === s.kid && b.mapel_id === s.mapel).reduce((t, b) => t + b.jam_per_minggu, 0), placed = M.Jadwal.filter(r => r.kelas_id === s.kid && r.mapel_id === s.mapel).length, sisa = per - placed;
-      // Standar: pertemuan pertama mengikuti aturan (1→1, 2→2, 3→2+1, genap→2, ganjil≥5→3+…); harus berurutan N → N
-      const std = sisa <= 2 ? sisa : sisa === 3 ? 2 : sisa % 2 === 0 ? 2 : 3;
+      // Standar: sisa genap → 2 jam; sisa ganjil ≥3 → 3 jam (lalu sisanya 2 jam); harus berurutan N → N
+      const std = sisa <= 1 ? sisa : sisa % 2 === 0 ? 2 : 3;
       s.span = Math.max(1, Math.min(B >= 2 ? B : std, mx, sisa));
     }
   }
   s.span = Math.min(s.span, mx);
   $('slSpan').innerHTML = Array.from({ length: mx }, (_, i) => '<option value="' + (i + 1) + '"' + (i + 1 === s.span ? ' selected' : '') + '>' + (i + 1) + ' jam' + (i ? ' berurutan' : '') + '</option>').join('');
-  $('slSpanHint').textContent = (B >= 2 ? 'Mapel ini diatur harus berurutan ' + B + ' jam. ' : B === 0 ? 'Aturan standar: 3 jam = 3 atau 2+1, 5 = 3+2, genap = 2+2. ' : '') + 'Jam bernomor berurutan tetap berurutan walau terjeda istirahat; jam yang sudah terisi akan ditimpa.';
+  $('slSpanHint').textContent = (B >= 2 ? 'Mapel ini diatur harus berurutan ' + B + ' jam. ' : B === 0 ? 'Aturan standar: genap = tiap 2 jam; ganjil = 3 jam + sisa 2 jam. ' : '') + 'Blok non-KBM (istirahat, shalat, dll.) di antaranya diabaikan; jam yang sudah terisi akan ditimpa.';
   box.style.display = '';
 }
 function slotGuru(id) { S.slot.guru = id; slotWarn(); }
@@ -376,7 +376,7 @@ function editMapel(id) {
     title: id ? 'Ubah mata pelajaran' : 'Tambah mata pelajaran',
     body: '<div class="grid-2"><div class="field"><label class="form-label" for="fKode">Kode</label><input id="fKode" class="form-control" maxlength="8" value="' + esc(m.kode) + '" style="text-transform:uppercase"></div><div class="field"><label class="form-label" for="fKel">Kelompok</label><input id="fKel" list="dlKel" class="form-control" value="' + esc(m.kelompok) + '"><datalist id="dlKel"><option>Agama</option><option>Umum</option><option>Muatan Lokal</option><option>Pengembangan Diri</option></datalist></div></div>' +
       '<div class="field"><label class="form-label" for="fNama">Nama mata pelajaran</label><input id="fNama" class="form-control" value="' + esc(m.nama) + '"></div>' + statusSel(m.status) +
-      '<div class="field"><label class="form-label" for="fBlok">Susunan jam dalam sehari</label><select id="fBlok" class="form-select" onchange="blokHint()"><option value="0"' + (!m.blok_jam ? ' selected' : '') + '>Standar (otomatis: 3 jam = 3 atau 2+1, 5 = 3+2, genap = 2+2…)</option><option value="1"' + (m.blok_jam === 1 ? ' selected' : '') + '>Bebas (boleh terpisah-pisah)</option>' + [2, 3, 4, 5, 6].map(n => '<option value="' + n + '"' + (m.blok_jam === n ? ' selected' : '') + '>Harus berurutan: ' + n + ' jam per pertemuan</option>').join('') + '</select><div class="form-text" id="fBlokHint"></div></div>' +
+      '<div class="field"><label class="form-label" for="fBlok">Susunan jam dalam sehari</label><select id="fBlok" class="form-select" onchange="blokHint()"><option value="0"' + (!m.blok_jam ? ' selected' : '') + '>Standar (genap: tiap pertemuan 2 jam; ganjil: 3 jam + sisa 2 jam)</option><option value="1"' + (m.blok_jam === 1 ? ' selected' : '') + '>Bebas (boleh terpisah-pisah)</option>' + [2, 3, 4, 5, 6].map(n => '<option value="' + n + '"' + (m.blok_jam === n ? ' selected' : '') + '>Harus berurutan: ' + n + ' jam per pertemuan</option>').join('') + '</select><div class="form-text" id="fBlokHint"></div></div>' +
       '<div class="field"><label class="form-label" for="fGab">Kelas gabungan (satu guru, beberapa kelas bersamaan)</label><select id="fGab" class="form-select"><option value="0"' + (!(m.gabung_maks >= 2) ? ' selected' : '') + '>Tidak — satu guru hanya satu kelas pada satu jam</option>' + [2, 3, 4, 5, 6].map(n => '<option value="' + n + '"' + (m.gabung_maks === n ? ' selected' : '') + '>Boleh digabung hingga ' + n + ' kelas</option>').join('') + '</select><div class="form-text">Contoh: PJOK dua rombel digabung di lapangan. Hanya kelas <b>satu tingkat</b> yang digabung otomatis. Tiap rombel tetap dihitung sebagai jam mengajar tersendiri.</div></div>' +
       '<h3 class="fs-6 mb-1">Jam standar per minggu tiap tingkat</h3><p class="small muted">Boleh berbeda antar tingkat. Jumlah jam dan mapel dapat disesuaikan per rombel di Data → Beban.</p>' +
       (ts.length ? '<div class="grid-3">' + ts.map((t, i) => '<div class="field"><label class="form-label" for="jt' + i + '">Tingkat ' + esc(t) + '</label><input id="jt' + i + '" type="number" min="0" max="30" class="form-control" value="' + ((M.MapelJam.filter(x => x.mapel_id === id && x.tingkat === t)[0] || {}).jam_per_minggu || '') + '"></div>').join('') + '</div>' : '<div class="notice warn"><i class="bi bi-exclamation-triangle"></i><div>Tambahkan kelas terlebih dahulu agar tingkat tersedia.</div></div>'),
@@ -386,13 +386,13 @@ function editMapel(id) {
   blokHint();
 }
 /** Jam bersambung terpanjang pada pengaturan waktu saat ini (dibatasi istirahat/blok/upacara) */
-/** Jam bernomor berurutan terpanjang (istirahat/shalat tidak memutus; kegiatan yang menempati nomor jam, mis. upacara, memutus) */
-function maxRun() { let best = 0; Object.keys(X.byT).forEach(t => { const b = X.byT[t]; b.days.forEach(d => { let run = 0, prev = -9; b.kbm[d].forEach(r => { run = r.jam_ke === prev + 1 ? run + 1 : 1; prev = r.jam_ke; best = Math.max(best, run); }); }); }); return best; }
+/** Jumlah jam pelajaran terbanyak dalam sehari = pertemuan berurutan terpanjang (istirahat, shalat, upacara, dan blok non-KBM lain diabaikan) */
+function maxRun() { let best = 0; Object.keys(X.byT).forEach(t => { const b = X.byT[t]; b.days.forEach(d => { best = Math.max(best, b.kbm[d].length); }); }); return best; }
 function blokHint() {
   const e = $('fBlokHint'); if (!e) return; const n = Number(val('fBlok')) || 0, mx = maxRun();
-  e.innerHTML = n === 0 ? 'Aturan otomatis: 1 jam = 1 • 2 = 2 • 3 = 3 atau 2+1 • 4 = 2+2 • 5 = 3+2 • genap = 2+2+… (juga 3+3+… bila habis dibagi 3). Jam bernomor berurutan tetap dianggap berurutan walau terjeda istirahat.'
+  e.innerHTML = n === 0 ? 'Aturan otomatis, tiap pertemuan = jam pelajaran <b>berurutan</b> (blok non-KBM di antaranya diabaikan):<br>• jam <b>genap</b> (2, 4, 6, 8): tiap pertemuan 2 jam → 4 = 2+2, 6 = 2+2+2<br>• jam <b>ganjil</b> (3, 5, 7): satu pertemuan 3 jam, sisanya 2 jam → 3 = 3, 5 = 3+2, 7 = 3+2+2<br>• 1 jam: 1 jam.'
     : n === 1 ? 'Jam boleh terpisah-pisah (sistem tetap mengutamakan pasangan 2 jam).'
-    : (n > mx ? '<span style="color:var(--err)"><b>Tidak mungkin terpenuhi:</b> jam bernomor berurutan terpanjang hanya ' + mx + ' jam.</span>' : 'Jam berurutan terpanjang pada pengaturan waktu: ' + mx + ' jam. Sisa jam yang kurang dari ' + n + ' dijadikan satu pertemuan lebih pendek.');
+    : (n > mx ? '<span style="color:var(--err)"><b>Tidak mungkin terpenuhi:</b> satu hari hanya memuat ' + mx + ' jam pelajaran.</span>' : 'Tiap pertemuan ' + n + ' jam berurutan (blok non-KBM diabaikan); sisa jam yang kurang dari ' + n + ' dijadikan satu pertemuan lebih pendek.');
 }
 async function saveMapel(btn) {
   const jm = {}; S.ts.forEach((t, i) => { jm[t] = val('jt' + i); });
