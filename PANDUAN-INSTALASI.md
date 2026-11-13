@@ -136,7 +136,7 @@ Jika tampilan lama masih muncul: **Ctrl+Shift+R**. Setelah mengubah berkas JS/CS
 | --- | --- | --- |
 | Situs menampilkan **404** | `index.html` tidak di root repo / salah folder saat `git init` | Buka repo di GitHub: harus terlihat `index.html` di root. Jika terlihat folder lain, push ulang dari folder `jadwal-mts` |
 | Muncul peringatan kuning *"Backend Apps Script belum diperbarui"*, atau pesan galat lama (mis. *"Durasi blok … harus bilangan bulat 1–240"* saat menyimpan Upacara di jam ke-1) | `Kode.gs` sudah ditempel di editor, tetapi **alamat /exec masih menjalankan versi lama** | Apps Script → **Terapkan → Kelola deployment → ✏️ Edit → Versi: Versi baru → Terapkan**. Alamat `/exec` tetap sama. Cek: `…/exec?action=ping` harus memuat `"v":"1.1.0"` |
-| Pilihan **Kelas gabungan** / **Susunan jam** di Data → Mapel selalu kembali ke "Tidak"/"Standar" setelah disimpan (atau muncul banner kuning *"Backend belum diperbarui"*) | Backend (Apps Script) yang berjalan di alamat `/exec` masih **versi lama**; kolom pengaturan baru diabaikan tanpa galat | Tempel `Kode.gs` terbaru → **Terapkan → Kelola deployment → ✏️ Edit → Versi: Versi baru → Terapkan** → jalankan `setupAppEnvironment` sekali. Cek `…/exec?action=ping` harus memuat `"v":"1.4.0"` (atau lebih baru), lalu muat ulang situs (Ctrl+Shift+R) dan simpan ulang mapel |
+| Pilihan **Kelas gabungan** / **Susunan jam** di Data → Mapel selalu kembali ke "Tidak"/"Standar" setelah disimpan (atau muncul banner kuning *"Backend belum diperbarui"*) | Backend (Apps Script) yang berjalan di alamat `/exec` masih **versi lama**; kolom pengaturan baru diabaikan tanpa galat | Tempel `Kode.gs` terbaru → **Terapkan → Kelola deployment → ✏️ Edit → Versi: Versi baru → Terapkan** → jalankan `setupAppEnvironment` sekali. Cek `…/exec?action=ping` harus memuat `"v":"1.6.0"` (atau lebih baru), lalu muat ulang situs (Ctrl+Shift+R) dan simpan ulang mapel |
 | Setup gagal: *"Anda tidak memiliki izin untuk memanggil ScriptApp.getProjectTriggers"* | Izin `script.scriptapp` belum diberikan (otorisasi lama tanpa izin ini) | Ganti `appsscript.json` dengan versi terbaru (berisi `oauthScopes`) → simpan → jalankan `pasangTrigger` → **Tinjau izin → Izinkan**. Bila jendela izin tidak muncul: buka <https://myaccount.google.com/permissions>, cabut akses *Jadwal*, lalu jalankan ulang |
 | Lupa / tidak tahu password Super Admin | Sudah diganti, atau setup versi lama memakai password acak | Jalankan fungsi `resetSuperAdmin` → password menjadi `admin123` (wajib diganti saat login) |
 | Halaman tanpa styling, 404 pada `.css/.js` | Berkas diunggah via web GitHub sehingga rata di root | Push dari terminal agar folder `css/` & `js/` terjaga |
@@ -222,3 +222,15 @@ Contoh: pilih jenis *Upacara*, hari *Senin*, posisi *Menggantikan jam pelajaran 
 - **Bentrok guru ditentukan dari waktu yang bertumpuk**, bukan nomor jam. Guru yang mengajar VII jam ke-6 (10:35–11:15) dan IX jam ke-5 (10:00–10:40) tetap dianggap bentrok karena waktunya bertumpuk; sebaliknya jam bernomor sama pada tingkat berbeda yang waktunya tidak bertumpuk bukan bentrok. Susun otomatis ikut menghindari tumpukan ini.
 - **Ketersediaan guru** tetap dicatat per nomor jam (grid memakai tabel acuan tingkat terendah).
 - Menambah kelas dengan tingkat baru otomatis membuat tabel jam untuk tingkat tersebut.
+
+## L. Jam kosong sebelum blok non-KBM & tombol "Rapikan jam kosong"
+
+**Yang dimaksud jam kosong:** slot pelajaran yang kosong *sebelum* jam terakhir terisi pada hari itu (termasuk sebelum istirahat/shalat, atau di awal hari). Slot kosong di **akhir** hari tidak dihitung.
+
+- **Susun otomatis** kini berusaha merapatkan setiap hari kelas dari jam pelajaran pertama: urutan pertemuan dalam satu hari ditata ulang, pertemuan utuh dapat dipindah ke hari lain, dan pertemuan yang gagal ditempatkan dicoba lagi dengan memindahkan paling banyak dua pertemuan penghalang. Semua pemindahan tetap menjaga: tidak bentrok waktu guru, ketersediaan guru, batas jam harian/mingguan, dan aturan susunan jam mapel.
+- **Jadwal → Rapikan jam kosong** merapikan jadwal yang **sudah ada** (termasuk hasil edit manual) tanpa menyusun ulang dari nol. Pilih *Semua kelas aktif* atau *Hanya kelas terpilih*.
+  - **Bawaan: hanya menggeser di hari yang sama** dan mempertahankan urutan pertemuan sebisanya. Centang *Boleh memindahkan pertemuan ke hari lain* bila perlu.
+  - Slot **terkunci** tidak digeser.
+  - Hasil ditampilkan, mis. *"jam kosong 3 → 0 (4 jam dipindah)"*.
+- Pada **Per kelas**, jam kosong ditandai **kuning** di grid dan daftar harian, dengan peringatan di atas jadwal. Dasbor memuat insight jumlah jam kosong.
+- **Batasan:** jam kosong tidak selalu bisa dihilangkan. Bila guru yang diperlukan tidak tersedia/penuh pada jam-jam yang cocok, atau jam pelajaran memang belum seluruhnya tertempatkan, sebagian jam kosong tetap tersisa. Periksa daftar "belum tertempatkan" dan ketersediaan guru; longgarkan lalu jalankan *Rapikan* lagi.

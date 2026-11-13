@@ -60,7 +60,7 @@ PAGES.jadwal = {
     else if (S.jv === 'guru') body = jadwalGuru(gl);
     else body = '<div class="card-x"><h2><i class="bi bi-table"></i> Rekap seluruh kelas</h2><p class="small muted">Ketuk sel untuk mengubah. Kotak merah = peringatan bentrok.</p>' + rekapHtml(kl) + '</div>';
     el.innerHTML = '<div class="page-head"><div><h1>Jadwal Pelajaran</h1><p>Susun otomatis, lalu rapikan manual.</p></div><div class="btn-row"><span class="chip ' + (st === 'Dipublikasikan' ? 'ok' : 'warn') + '">' + esc(st) + '</span><button class="chip ' + (nc ? 'err' : 'ok') + '" style="cursor:pointer" onclick="showConflicts()"><i class="bi ' + (nc ? 'bi-exclamation-octagon' : 'bi-check-circle') + '"></i> ' + (nc ? nc + ' peringatan' : 'Tanpa bentrok') + '</button></div></div>' +
-      '<div class="btn-row mb-3"><button class="btn btn-primary" onclick="openAuto()"><i class="bi bi-magic"></i> Susun otomatis</button><button class="btn btn-outline-danger" onclick="openClear()"><i class="bi bi-eraser"></i> Kosongkan</button></div>' +
+      '<div class="btn-row mb-3"><button class="btn btn-primary" onclick="openAuto()"><i class="bi bi-magic"></i> Susun otomatis</button><button class="btn btn-outline-primary" onclick="openRapikan()"><i class="bi bi-arrows-collapse"></i> Rapikan jam kosong</button><button class="btn btn-outline-danger" onclick="openClear()"><i class="bi bi-eraser"></i> Kosongkan</button></div>' +
       '<div class="seg" role="tablist"><button class="' + (S.jv === 'kelas' ? 'on' : '') + '" onclick="jView(\'kelas\')">Per kelas</button><button class="' + (S.jv === 'guru' ? 'on' : '') + '" onclick="jView(\'guru\')">Per guru</button><button class="' + (S.jv === 'rekap' ? 'on' : '') + '" onclick="jView(\'rekap\')">Rekap</button></div>' + body;
   }
 };
@@ -77,6 +77,7 @@ function jadwalKelas(kl) {
     '<div class="card-x"><div class="d-flex justify-content-between align-items-center gap-2 mb-1"><h2 class="mb-0"><i class="bi bi-mortarboard"></i> ' + esc(X.kelas[S.jk].nama) + '</h2><span class="small fw-7">' + done + ' / ' + target + ' jam</span></div>' +
     '<div class="progress-x mb-2" role="progressbar" aria-valuenow="' + done + '" aria-valuemin="0" aria-valuemax="' + target + '"><i style="width:' + (target ? Math.min(100, done / target * 100) : 0) + '%"></i></div>' +
     (target ? (sisa ? '<div class="d-flex flex-wrap gap-1 mb-3">' + sisa + '</div>' : '<p class="small mb-3" style="color:var(--ok)"><i class="bi bi-check-circle-fill"></i> Seluruh beban kelas ini sudah tertempatkan.</p>') : '<div class="notice warn"><i class="bi bi-exclamation-triangle"></i><div>Beban mengajar kelas ini belum diisi. Buka menu <b>Data → Beban</b>.</div></div>') +
+    (holeSet(S.jk).size ? '<div class="notice warn"><i class="bi bi-exclamation-triangle"></i><div><b>' + holeSet(S.jk).size + ' jam kosong</b> sebelum jam terakhir terisi (ditandai kuning). <button class="btn btn-sm btn-outline-secondary ms-2" onclick="openRapikan()">Rapikan</button></div></div>' : '') +
     '<p class="small muted"><i class="bi bi-hand-index"></i> Ketuk sel untuk memilih mata pelajaran & guru.</p>' + schedView('kelas', S.jk, { edit: true }) + '</div>';
 }
 function jadwalGuru(gl) {
@@ -224,6 +225,23 @@ async function clearSlot(btn) {
 }
 
 // ── Susun otomatis & kosongkan ──
+function totalHoles() { return aktifK().reduce((n, k) => n + holeSet(k.id).size, 0); }
+function openRapikan() {
+  const k = X.kelas[S.jk], th = totalHoles();
+  openModal({
+    title: 'Rapikan jam kosong',
+    body: '<p class="small muted">Menggeser pertemuan agar jadwal <b>rapat dari jam pelajaran pertama</b>, tanpa jam kosong sebelum blok non-KBM atau sebelum jam terakhir terisi. Tetap aman bagi guru (tidak bentrok waktu, ketersediaan, batas jam) dan sesuai aturan susunan jam mapel. Slot terkunci tidak digeser.</p>' +
+      '<div class="notice ' + (th ? 'warn' : 'ok') + '"><i class="bi ' + (th ? 'bi-exclamation-triangle' : 'bi-check-circle-fill') + '"></i><div>Saat ini: <b>' + th + ' jam kosong</b> pada seluruh kelas aktif.</div></div>' +
+      '<label class="opt"><input type="radio" name="rpScope" value="all" checked><span class="ob"><b>Semua kelas aktif</b></span></label>' + (k ? '<label class="opt"><input type="radio" name="rpScope" value="one"><span class="ob"><b>Hanya kelas ' + esc(k.nama) + '</b><small>' + holeSet(S.jk).size + ' jam kosong</small></span></label>' : '') +
+      '<div class="form-check mt-3"><input class="form-check-input" type="checkbox" id="rpHari"><label class="form-check-label" for="rpHari">Boleh memindahkan pertemuan ke <b>hari lain</b><span class="d-block form-text">Bawaan: hanya menggeser di hari yang sama.</span></label></div>',
+    footer: '<button class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary" data-busy="Merapikan…" onclick="runRapikan(this)"><i class="bi bi-arrows-collapse"></i> Rapikan</button>'
+  });
+}
+async function runRapikan(btn) {
+  const one = (document.querySelector('input[name=rpScope]:checked') || {}).value === 'one';
+  const r = await act(btn, 'apiRapikanJadwal', S.token, { kelasIds: one ? [S.jk] : [], lintasHari: chk('rpHari') });
+  if (!r) return; applyRes(r); closeModal(); rerender(); toast(r.message, r.data.sesudah ? 'warn' : 'ok', 7000);
+}
 function openAuto() {
   const lk = ADM.Jadwal.filter(r => r.terkunci).length, k = X.kelas[S.jk];
   openModal({

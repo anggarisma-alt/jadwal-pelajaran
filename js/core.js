@@ -198,6 +198,12 @@ const tRankC = t => { const m = { I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 
 const tblOf = (kind, id) => (kind === 'kelas' ? ((X.kt || {})[id] || '') : '');
 /** Interval menit [mulai, selesai] jam KBM sebuah kelas (tabel jam sesuai tingkatnya) */
 const ivK = (kid, d, j) => { const b = X.byT[(X.kt || {})[kid]] || X.byT['']; return b.iv[d + '|' + j]; };
+/** Slot kosong yang berada SEBELUM jam terakhir terisi pada hari itu ('hari|jam') = jam kosong di awal/tengah hari (termasuk sebelum blok non-KBM) */
+function holeSet(kid) {
+  const b = X.byT[(X.kt || {})[kid]] || X.byT[''], out = new Set();
+  b.days.forEach(d => { const list = b.kbm[d]; let last = -1; list.forEach((r, i) => { if (X.jd[kid + '|' + d + '|' + r.jam_ke]) last = i; }); list.forEach((r, i) => { if (i < last && !X.jd[kid + '|' + d + '|' + r.jam_ke]) out.add(d + '|' + r.jam_ke); }); });
+  return out;
+}
 const kodeG = g => (g && g.kode) || (g ? initials(g.nama) : '');   // kode huruf guru (cadangan: inisial)
 function reindex(m) {
   const x = {};
@@ -329,6 +335,7 @@ function renderGrid(kind, id, opt) {
   opt = opt || {};
   useTingkat(tblOf(kind, id));
   const today = todayName(), rows = layoutRows();
+  const holes = kind === 'kelas' && opt.edit ? holeSet(id) : null;
   const ref = X.days[0];
   let h = opt.print ? '<table class="pgrid">' : '<div class="grid-wrap"><table class="sgrid">';
   h += '<thead><tr><th class="g-time">Jam</th>' + X.days.map(d => '<th class="' + (d === today ? 'today' : '') + '">' + d + '</th>').join('') + '</tr></thead><tbody>';
@@ -348,7 +355,7 @@ function renderGrid(kind, id, opt) {
       const c = cellOf(kind, id, d, row.j);
       if (opt.print) { h += '<td>' + (c ? '<b>' + esc(kodeOf(c)) + '</b><br>' + esc(kind === 'kelas' ? kodeG(c.guru) : kelasNames(c)) : '') + '</td>'; return; }
       if (kind === 'guru' && !c && X.un.has(id + '|' + d + '|' + row.j)) { h += '<td class="unv">Tidak bisa</td>'; return; }
-      if (!c) { h += '<td>' + (opt.edit ? '<button class="cell empty" aria-label="Isi ' + d + ' jam ke-' + row.j + '" onclick="openSlot(\'' + id + '\',\'' + d + '\',' + row.j + ')"><i class="bi bi-plus-lg"></i></button>' : '') + '</td>'; return; }
+      if (!c) { h += '<td>' + (opt.edit ? '<button class="cell empty' + (holes && holes.has(d + '|' + row.j) ? ' hole' : '') + '" aria-label="' + (holes && holes.has(d + '|' + row.j) ? 'Jam kosong, ' : '') + 'Isi ' + d + ' jam ke-' + row.j + '" onclick="openSlot(\'' + id + '\',\'' + d + '\',' + row.j + ')"><i class="bi bi-plus-lg"></i></button>' : '') + '</td>'; return; }
       const cls = 'cell' + (cellConf(c) ? ' conf' : '');
       const inner = cellInner(kind, c) + (c.r.terkunci ? '<i class="bi bi-lock-fill lk"></i>' : '');
       h += '<td>' + (opt.edit ? '<button class="' + cls + '" style="--h:' + (X.hue[c.r.mapel_id] || 150) + '" onclick="openSlot(\'' + id + '\',\'' + d + '\',' + row.j + ')" aria-label="' + esc((c.mapel || {}).nama) + '">' + inner + '</button>'
@@ -382,6 +389,7 @@ function renderDayList(kind, id, opt) {
     const n = kind === 'guru' ? (M.Jadwal || []).filter(r => r.guru_id === id && r.hari === d).length : X.kbm[d].filter(r => cellOf(kind, id, d, r.jam_ke)).length;
     return '<button class="daytab ' + (d === S.day ? 'on' : '') + (d === today ? ' today' : '') + '" role="tab" aria-selected="' + (d === S.day) + '" onclick="setDay(\'' + d + '\')">' + d.slice(0, 3) + '<small>' + n + ' jam</small></button>';
   }).join('') + '</div><div class="daylist">';
+  const holes = kind === 'kelas' && opt.edit ? holeSet(id) : null;
   if (kind === 'guru') return h + guruDayHtml(id, S.day) + '</div>';   // per guru: urut menurut waktu nyata tiap kelas
   X.jam[S.day].forEach(r => {
     const t = '<div class="dl-time"><b>' + esc(r.mulai) + '</b>' + esc(r.selesai) + '</div>';
@@ -391,7 +399,7 @@ function renderDayList(kind, id, opt) {
     const tag = opt.edit ? 'button' : 'div';
     if (!c) {
       const unv = kind === 'guru' && X.un.has(id + '|' + S.day + '|' + r.jam_ke);
-      h += '<div class="dl-item">' + t + '<' + tag + ' class="dl-body ' + (unv ? 'unv' : 'empty') + '"' + click + '>' + (unv ? 'Tidak bisa mengajar' : (opt.edit ? '<i class="bi bi-plus-lg"></i> Jam ke-' + r.jam_ke + ' kosong' : 'Jam ke-' + r.jam_ke + ' — kosong')) + '</' + tag + '></div>';
+      h += '<div class="dl-item">' + t + '<' + tag + ' class="dl-body ' + (unv ? 'unv' : 'empty') + (holes && holes.has(S.day + '|' + r.jam_ke) ? ' hole' : '') + '"' + click + '>' + (unv ? 'Tidak bisa mengajar' : (opt.edit ? '<i class="bi bi-plus-lg"></i> Jam ke-' + r.jam_ke + ' kosong' : 'Jam ke-' + r.jam_ke + ' — kosong')) + '</' + tag + '></div>';
       return;
     }
     const sub = kind === 'kelas' ? (((c.guru || {}).nama || '') + ' (' + kodeG(c.guru) + ')') : kelasNames(c);
